@@ -17,6 +17,49 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
+  <!--
+    Transitive dependency version pins (security remediation).
+    AspNetCore.IdentityServer4.Store.NCache -> Alachisoft.NCache.SDK -> Microsoft.Windows.Compatibility
+    pulls in old, vulnerable versions of these packages. NuGet resolves a direct top-level
+    PackageReference over any transitively-requested version, so pinning here forces the safe
+    version project-wide without needing NCache itself to update.
+  -->
+  <ItemGroup>
+    <!-- CVE-2021-24112 (System.Drawing.Common RCE via unsafe deserialization); transitive was 5.0.0/5.0.20 -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.29" />
+    <!-- CVE-2024-0056 (System.Data.SqlClient / Microsoft.Data.SqlClient information disclosure); transitive was 4.5.1 -->
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <!-- CVE-2024-43483, CVE-2024-43484 (System.IO.Packaging denial of service); transitive was 4.5.0 -->
+    <PackageReference Include="System.IO.Packaging" Version="6.0.2" />
+
+    <!--
+      Remaining transitive vulnerabilities from the same NCache/Windows.Compatibility chain.
+      None of these packages are referenced anywhere in this project's own code (AspNetCore.IdentityServer4.Store.NCache
+      is a registered PackageReference but is never actually wired up via .AddOperationalStore()/etc. in Program.cs),
+      so these are dead-weight transitive dependencies - patching them carries no functional/behavioral risk here.
+    -->
+    <PackageReference Include="AutoMapper" Version="16.2.0" /> <!-- GHSA-rvv3-g6hj-g44x: DoS via uncontrolled recursion; was 9.0.0 -->
+    <!-- AutoMapper 16.2.0 itself requires Microsoft.IdentityModel.JsonWebTokens >= 8.14.0; pinned explicitly to satisfy that (already-safe 6.35.0 would otherwise be reported as a downgrade) -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.21.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.21.0" />
+    <PackageReference Include="Azure.Identity" Version="1.11.4" /> <!-- GHSA-wvxc-855f-jvrv, GHSA-m5vv-6r4h-3vj9; was 1.10.3 -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="3.1.18" /> <!-- GHSA-q7cg-43mg-qp69: info disclosure; was 3.0.0 -->
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" /> <!-- GHSA-x674-v45j-fwxw, GHSA-m5vv-6r4h-3vj9; was 4.56.0 -->
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="2.19.180" /> <!-- GHSA-5pm2-9mr2-3frq: component takeover; was 2.19.100 -->
+    <PackageReference Include="System.DirectoryServices.Protocols" Version="5.0.1" /> <!-- GHSA-9cxh-gqpx-qc5m: credential disclosure; was 4.5.0 -->
+    <PackageReference Include="System.Formats.Asn1" Version="10.0.10" /> <!-- CVE-2024-38095/GHSA-447r-wph3-92pm: DoS; was 5.0.0 -->
+    <PackageReference Include="System.Net.Http" Version="4.3.4" /> <!-- GHSA-7jgj-8wvc-jh57: info disclosure; was 4.3.0 -->
+    <PackageReference Include="System.Net.Http.WinHttpHandler" Version="4.5.4" /> <!-- GHSA-6xh7-4v2w-36q6; was 4.4.0 -->
+    <PackageReference Include="System.Private.ServiceModel" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p: cert validation; was 4.4.1 -->
+    <PackageReference Include="System.ServiceModel.Duplex" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p; was 4.4.1 -->
+    <PackageReference Include="System.ServiceModel.Http" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p; was 4.4.1 -->
+    <PackageReference Include="System.ServiceModel.NetTcp" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p; was 4.4.1 -->
+    <PackageReference Include="System.ServiceModel.Primitives" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p; was 4.4.1 -->
+    <PackageReference Include="System.ServiceModel.Security" Version="4.4.4" /> <!-- GHSA-p9wx-v264-q34p; was 4.4.1 -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="4.7.1" /> <!-- GHSA-vh55-786g-wjwj: info disclosure; was 4.5.0 -->
+    <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" /> <!-- GHSA-cmhx-cq75-c4mj: ReDoS; was 4.3.0 -->
+  </ItemGroup>
+
   <ItemGroup>
     <None Update="client.ncconf">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

@@ -7,6 +7,7 @@ using OnecertApiV1.Middleware;
 using OnecertApiV1.Services;
 using OnecertApiV1.Services.Implementation;
 using OnecertApiV1.Services.Interface;
+using OnecertApiV1.Vault;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,36 @@ builder.Services.AddSingleton<clsData>();
 builder.Services.AddSingleton<clsParameters>();
 builder.Services.AddSingleton<clsMail>();
 builder.Services.AddSingleton<clsSetup>();
+
+// HashiCorp Vault: resolve the SQL User ID/Password from Vault and inject them into the
+// existing "SqlConnection" connection string before the app builds, so every existing
+// consumer (DapperContext, DataRepo) keeps reading ConnectionStrings:SqlConnection unchanged.
+builder.Services.AddHashiCorpVault(configuration);
+
+var vaultOptions = configuration.GetSection(VaultOptions.SectionName).Get<VaultOptions>() ?? new VaultOptions();
+if (vaultOptions.Enabled)
+{
+    using (var vaultBootstrapProvider = builder.Services.BuildServiceProvider())
+    {
+        var vaultLogger = vaultBootstrapProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Vault.Bootstrap");
+        var vaultService = vaultBootstrapProvider.GetRequiredService<IHashiCorpVaultService>();
+        try
+        {
+            var vaultConnectionString = await vaultService.GetSqlConnectionStringAsync();
+            configuration[$"ConnectionStrings:{vaultOptions.ConnectionStringName}"] = vaultConnectionString;
+            vaultLogger.LogInformation("Successfully retrieved database credentials from HashiCorp Vault.");
+        }
+        catch (Exception ex)
+        {
+            vaultLogger.LogCritical(ex, "Failed to retrieve database credentials from HashiCorp Vault. Application will not start.");
+            throw;
+        }
+    }
+}
+else
+{
+    Console.WriteLine("HashiCorp Vault integration disabled (Vault:Enabled=false); using ConnectionStrings:SqlConnection from configuration as-is.");
+}
 
 builder.Services.AddSingleton<DapperContext>();
 builder.Services.AddScoped<IDataRepo, DataRepo>();
